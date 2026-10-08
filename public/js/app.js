@@ -871,7 +871,10 @@ async function startApp(){
 }
 function renderChrome(){
   const u = Store.user, av = $('#userBtn');
-  if (cloud() && u){ av.hidden = false; av.textContent = (u.name || u.email || '?').trim().slice(0, 1).toUpperCase(); av.title = `${u.name} · ${Store.household.name} — account & family`; }
+  if (cloud() && u){
+    av.hidden = false; av.textContent = (u.name || u.email || '?').trim().slice(0, 1).toUpperCase(); av.title = `${u.name} · ${Store.household.name}`;
+    $('#menuName').textContent = u.name; $('#menuEmail').textContent = u.email; $('#menuFamily').textContent = Store.household.name;
+  }
   else av.hidden = true;
   $('footer').innerHTML = cloud()
     ? `Signed in as ${esc(u.name)} · ${esc(Store.household.name)}. Your data is stored in your family's private database. <a href="#setup">Export a backup</a> now and then.`
@@ -899,7 +902,14 @@ Store.on('remote', cfg => {
 Store.on('signedOut', () => location.reload());
 
 /* ============================== events ============================== */
+function setUserMenu(open){
+  $('#userMenu').hidden = !open; $('#userBtn').setAttribute('aria-expanded', String(open));
+  if (open) $('#userMenu [role=menuitem]').focus();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#userMenu').hidden){ setUserMenu(false); $('#userBtn').focus(); } });
 document.addEventListener('click', e => {
+  // the account menu closes on any click except the one that toggles it; a chosen item still runs below
+  if (!$('#userMenu').hidden && !e.target.closest('[data-action="userMenu"]')) setUserMenu(false);
   const gl = e.target.closest('[data-gate]'); if (gl){ e.preventDefault(); renderGate(gl.dataset.gate); return; }
   const tab = e.target.closest('#tabs button'); if (tab){ go(tab.dataset.tab); return; }
   const g = e.target.closest('[data-goto]'); if (g){ e.preventDefault(); if (appStarted) go(g.dataset.goto); return; }
@@ -908,6 +918,7 @@ document.addEventListener('click', e => {
   if (!appStarted && !['reload','signOut','theme'].includes(act)) return;
   switch (act){
     case 'reload': location.reload(); break;
+    case 'userMenu': setUserMenu($('#userMenu').hidden); break;
     case 'signOut': e.preventDefault(); (async () => { if (!(await Store.flush()) && !confirm('Some changes are not saved yet. Sign out anyway?')) return; await Store.signOut(); location.replace(location.pathname); })(); break;
     case 'openAdd': openAdd(); break;
     case 'closeAdd': $('#txDialog').close(); break;

@@ -141,6 +141,7 @@ dialog .amount-in{font-size:24px!important;font-weight:650!important}
 }
 
 /* ---------- sign-in, family set-up & status ---------- */
+.gate .actions{margin-left:auto}
 .gate nav,.gate .actions .btn,.gate .actions .sync,.gate .actions .avatar,.gate footer{display:none}
 .gatewrap{max-width:440px;margin:6vh auto 0}
 .gatecard.wide{max-width:none}

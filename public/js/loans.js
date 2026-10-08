@@ -138,7 +138,7 @@ function renderLoans(){
   const free = active.length ? active.map(x => x.s.end).sort().pop() : null;
   const bankLY = all.filter(x => x.s.lastYear.bank);
 
-  v.innerHTML = `<div class="pagehead"><h1>Loans &amp; milestones</h1><button class="btn primary" data-action="addLoan">+ Add loan</button></div>
+  v.innerHTML = `${demoBanner()}<div class="pagehead"><h1>Loans &amp; milestones</h1><button class="btn primary" data-action="addLoan">+ Add loan</button></div>
   <div class="grid g4" style="margin-bottom:16px">
     <div class="card kpi"><span>Still owed</span><strong>${money(owed, 0)}</strong><small>${active.length} active loan${active.length === 1 ? '' : 's'}</small></div>
     <div class="card kpi"><span>Paid in ${ly}</span><strong>${money(paidLY, 0)}</strong><small>${money(sum(all.map(x => x.s.lastYear.interest)), 0)} of it interest</small></div>

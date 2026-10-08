@@ -286,11 +286,28 @@ function emptyState(){
 }
 function backupBanner(){
   if (Store.status === 'error' && !cloud()) return `<div class="banner">Browser storage isn't available, so changes won't survive a reload. <button class="btn" data-action="exportJSON">Export backup</button></div>`;
-  if (!state.txns.length) return '';
+  if (!state.txns.length || hasDemoData()) return '';
   const lb = state.settings.lastBackup, days = lb ? (Date.now() - new Date(lb)) / 864e5 : Infinity;
   if (days < (cloud() ? 90 : 30)) return '';
   const why = cloud() ? 'Your data is safe in the database, but a copy of your own is good insurance.' : 'Your data lives only in this browser — clearing site data would erase it.';
   return `<div class="banner"><span>${lb ? `Last backup was ${Math.floor(days)} days ago.` : 'You haven’t made a backup yet.'} ${why}</span><button class="btn" data-action="exportJSON">Export backup</button></div>`;
+}
+const hasDemoData = () => state.txns.some(t => t.src === 'demo') || state.loans.some(l => l.src === 'demo');
+const onlyDemoData = () => hasDemoData() && state.txns.every(t => t.src === 'demo') && state.loans.every(l => l.src === 'demo');
+// Shown on every page while example data is loaded, so it's obvious how to get back to a real budget
+function demoBanner(){
+  if (!hasDemoData()) return '';
+  return onlyDemoData()
+    ? `<div class="banner info"><span>You're exploring <b>demo data</b>. When you're ready, start your own budget from scratch.</span><button class="btn primary" data-action="newBudget">Start my real budget</button></div>`
+    : `<div class="banner info"><span>Your budget still contains <b>demo data</b> next to your own.</span><button class="btn" data-action="removeDemo">Remove demo data</button></div>`;
+}
+// A clean slate: default categories and rules, but no budget amounts, no transactions and no loans.
+// Personal preferences (currency, goals, history length) are kept.
+function freshState(){
+  const s = defaultState(), o = state.settings;
+  s.categories.forEach(c => c.budget = 0);
+  s.settings = {...s.settings, currency: o.currency, savingsGoal: o.savingsGoal, smallThreshold: o.smallThreshold, keepMonths: o.keepMonths, lastBackup: o.lastBackup};
+  return s;
 }
 
 /* ============================== dashboard ============================== */
@@ -306,7 +323,7 @@ function renderDashboard(){
   const budgeted = state.categories.filter(c => c.type === 'expense' && c.budget > 0);
   const rateCls = s.rate == null ? '' : s.rate * 100 >= goal ? 'ok' : s.rate < 0 ? 'bad' : 'warnc';
 
-  v.innerHTML = `${backupBanner()}
+  v.innerHTML = `${demoBanner()}${backupBanner()}
   <div class="pagehead"><h1>Dashboard</h1>${monthPicker()}</div>
   <div class="grid g4" style="margin-bottom:16px">
     <div class="card kpi"><span>Income</span><strong>${money(s.inc,0)}</strong><small>${p.n ? (s.inc >= p.inc ? '▲ ' : '▼ ') + money(Math.abs(s.inc - p.inc),0) + ' vs ' + mLabel(prev) : '&nbsp;'}</small></div>
@@ -351,7 +368,7 @@ function renderInsights(){
   const v = $('#view');
   if (!state.txns.length){ v.innerHTML = `<div class="pagehead"><h1>Leaks &amp; savings</h1></div>` + emptyState(); return; }
   const m = ui.month, I = computeInsights(m), S = state.settings;
-  v.innerHTML = `<div class="pagehead"><h1>Leaks &amp; savings</h1>${monthPicker()}</div>
+  v.innerHTML = `${demoBanner()}<div class="pagehead"><h1>Leaks &amp; savings</h1>${monthPicker()}</div>
   ${I.uncat ? `<div class="banner info"><span>${I.uncat} transaction${I.uncat>1?'s are':' is'} uncategorised in the last 12 months — categorising them sharpens these insights.</span><button class="btn" data-action="showUncat">Categorise now</button></div>` : ''}
   <div class="grid g2">
     <div class="card span2"><div class="hero"><div><h2>Estimated savings potential</h2><p class="sub mt0">If you act on the levers below — based on ${mLabel(m,true)} and the months before it.</p></div><div class="big">${money(I.potential,0)}<span style="font-size:16px;font-weight:600">/yr</span></div></div>
@@ -397,7 +414,7 @@ function renderTransactions(){
   const ms = monthsWithData();
   // only pre-filter on a month the filter can actually show, otherwise the select says "All months" while the list is filtered
   if (ui.tx.month === null) ui.tx.month = ms.includes(ui.month) ? ui.month : '';
-  $('#view').innerHTML = `<div class="pagehead"><h1>Transactions</h1><div class="btnrow"><button class="btn" data-action="exportCSV">Export CSV</button><button class="btn primary" data-action="openAdd">+ Add</button></div></div>
+  $('#view').innerHTML = `${demoBanner()}<div class="pagehead"><h1>Transactions</h1><div class="btnrow"><button class="btn" data-action="exportCSV">Export CSV</button><button class="btn primary" data-action="openAdd">+ Add</button></div></div>
   <div class="card">
     <div class="filters">
       <select class="inp" id="fMonth"><option value="">All months</option>${ms.map(m => `<option value="${m}" ${m === ui.tx.month ? 'selected' : ''}>${mLabel(m,true)}</option>`).join('')}</select>
@@ -627,7 +644,7 @@ function renderSetup(){
   const S = state.settings, avg = avgSpend(ui.month, 3);
   const cats = state.categories.slice().sort((a,b) => ({expense:0,income:1,transfer:2}[a.type] - {expense:0,income:1,transfer:2}[b.type]));
   const dates = state.txns.map(t => t.date).sort();
-  $('#view').innerHTML = `<div class="pagehead"><h1>Budgets &amp; settings</h1></div>
+  $('#view').innerHTML = `${demoBanner()}<div class="pagehead"><h1>Budgets &amp; settings</h1></div>
   <div class="grid">
     ${cloud() ? familyCard() + accountCard() : ''}
     <div class="card"><h2>Preferences</h2><p class="sub">Used across the dashboard and insights${cloud() ? ' · shared with your family' : ''}</p>
@@ -660,8 +677,8 @@ function renderSetup(){
         <button class="btn primary" data-action="exportJSON">Export backup (.json)</button>
         <button class="btn" data-action="restore">Restore backup</button>
         <button class="btn" data-action="exportCSV">Export transactions (.csv)</button>
-        ${state.txns.some(t => t.src === 'demo') || state.loans.some(l => l.src === 'demo') ? '<button class="btn" data-action="removeDemo">Remove demo data</button>' : '<button class="btn" data-action="demo">Load demo data</button>'}
-        <button class="btn danger" data-action="reset">Erase everything</button>
+        ${hasDemoData() ? '<button class="btn" data-action="removeDemo">Remove demo data</button>' : '<button class="btn" data-action="demo">Load demo data</button>'}
+        <button class="btn danger" data-action="newBudget">Start a new budget</button>
       </div>
       <p class="small muted" style="margin:12px 0 0">${cloud() ? 'Everything is stored in your private Supabase database and shared only with the members of your family budget. Moving over from the old single-file version? Export a backup there and use "Restore backup" here.' : 'Local mode: data is stored only in this browser. To use the app on your phone and computer, export a backup on one and restore it on the other.'}</p>
     </div>
@@ -918,9 +935,15 @@ document.addEventListener('click', e => {
       const txt = s => /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
       const rows = [['Date','Description','Amount','Category','Type','Note']].concat(state.txns.slice().sort((x,y) => x.date.localeCompare(y.date)).map(t => [t.date, txt(t.desc), t.amount.toFixed(2), txt(catOf(t.cat).name), catOf(t.cat).type, txt(t.note || '')]));
       download(`transactions-${todayISO()}.csv`, '\uFEFF' + rows.map(r => r.map(x => /[",;\n]/.test(String(x)) ? '"' + String(x).replace(/"/g, '""') + '"' : x).join(',')).join('\n'), 'text/csv'); break; }
-    case 'reset': {
-      const who = cloud() ? ` for everyone in "${Store.household.name}"` : ' from this browser';
-      if (confirm(`Erase ALL transactions, loans, categories, budgets and rules${who}? This cannot be undone.`) && confirm('Really erase everything? Consider exporting a backup first.')){ state = defaultState(); Store.replaceAll(); save(); ui.month = curMonth(); ui.tx = {month:null, cat:'', q:''}; toast('Everything erased'); go('dashboard'); } break; }
+    case 'newBudget': {
+      const ok = onlyDemoData()
+        ? confirm('Remove the demo data and start your own budget from scratch?')
+        : confirm(`Start a new budget${cloud() ? ` for everyone in "${Store.household.name}"` : ''}? All transactions, loans, budgets, categories and rules are deleted and you start again from a clean slate. Your account${cloud() ? ' and family members are' : ' is'} kept.\n\nIf you might want this data later, click Cancel and use "Export backup" first.`)
+          && confirm('Really start over? This cannot be undone.');
+      if (!ok) break;
+      state = freshState(); Store.replaceAll(); save();
+      ui.month = curMonth(); ui.tx = {month:null, cat:'', q:''}; ui.imp = null;
+      toast('New budget started — import a bank CSV or add your first expense'); go('dashboard'); break; }
     case 'suggestBudgets': { const avg = avgSpend(ui.month, 3); let n = 0; state.categories.forEach(c => { if (c.type === 'expense' && !['uncat','loans'].includes(c.id) && avg[c.id] > 0){ c.budget = Math.max(10, Math.round(avg[c.id] * .9 / 10) * 10); n++; } }); if (!n){ toast('Need some spending data first'); break; } save(); toast(`Set ${n} budgets to 90% of your 3-month average`); render(); break; }
     case 'addCat': { const name = prompt('New category name'); if (!name || !name.trim()) break; const id = 'c_' + uid().slice(0, 8); state.categories.push({id, name: name.trim().slice(0, 60), color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), type:'expense', budget:0}); save(); render(); break; }
     case 'delCat': { const c = catOf(a.dataset.id); if (PROTECTED_CATS.has(c.id)) break; const n = state.txns.filter(t => t.cat === c.id).length; if (!confirm(`Delete category "${c.name}"?${n ? ` Its ${n} transactions become Uncategorized.` : ''}`)) break; state.txns.forEach(t => { if (t.cat === c.id) t.cat = 'uncat'; }); state.rules = state.rules.filter(r => r.cat !== c.id); state.categories = state.categories.filter(x => x.id !== c.id); save(); render(); break; }

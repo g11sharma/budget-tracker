@@ -1,13 +1,4 @@
 # Netlify: the site is the static "public" folder; no build step.
+# Security headers live in public/_headers so they also apply when the folder is dragged into Netlify.
 [build]
   publish = "public"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    # Only our own files, the two pinned CDN libraries and our Supabase project may load or be contacted.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://getekttkkapbldnvbezp.supabase.co wss://getekttkkapbldnvbezp.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"

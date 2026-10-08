@@ -20,8 +20,9 @@ public/            the website (what Netlify serves)
   js/store.js      data layer: login, family, sync with the database (or localStorage)
   js/loans.js      loan maths, Loans tab, loan dialog
   js/app.js        everything else: dashboard, insights, import, settings
+  _headers         security headers (Content-Security-Policy etc.)
 supabase/schema.sql  tables, security policies and functions
-netlify.toml       publish folder and security headers
+netlify.toml       tells Netlify to publish the public folder
 ```
 
 ## Set-up
@@ -46,7 +47,7 @@ Notes about the free plan:
 3. Every push to `main` is deployed automatically.
 4. Put the Netlify address in Supabase (step 1.4).
 
-`netlify.toml` sends a strict Content-Security-Policy that only allows this site, the two pinned CDN libraries and the Supabase project in `config.js`. **If you change the Supabase project, update the `connect-src` line too.**
+`public/_headers` sends a strict Content-Security-Policy that only allows this site, the two pinned CDN libraries and the Supabase project in `config.js`. **If you change the Supabase project, update the `connect-src` line too.**
 
 ### 3. Family
 

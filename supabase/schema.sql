@@ -1,3 +1,4 @@
+
 -- Money Leak Tracker — database schema for Supabase
 -- Run this whole file once in Supabase → SQL Editor → New query → Run.
 -- It is safe to run again: it only creates what is missing and refreshes functions and policies.

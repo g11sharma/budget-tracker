@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Money Leak Tracker</title>
+<meta name="description" content="Family budget: spending, savings leaks, loans and milestones.">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Money Tracker">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230f766e'/><text x='32' y='44' font-size='34' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>€</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" integrity="sha256-84flk1cwptlZmigZhqF26vzl6751FERiItIaoCnjHdU=" crossorigin="anonymous" defer></script>
+<script src="js/config.js" defer></script>
+<script src="js/store.js" defer></script>
+<script src="js/loans.js" defer></script>
+<script src="js/app.js" defer></script>
+</head>
+<body class="gate">
+<header class="top">
+  <div class="brand"><span class="logo">€</span><div><strong>Money Leak Tracker</strong><small>Family spending, savings &amp; loans</small></div></div>
+  <nav id="tabs">
+    <button data-tab="dashboard">Dashboard</button>
+    <button data-tab="insights">Leaks &amp; savings</button>
+    <button data-tab="loans">Loans</button>
+    <button data-tab="transactions">Transactions</button>
+    <button data-tab="import">Import</button>
+    <button data-tab="setup">Budgets &amp; settings</button>
+  </nav>
+  <div class="actions">
+    <button class="sync" id="sync" type="button" hidden></button>
+    <button class="btn primary" data-action="openAdd">+ Add</button>
+    <button class="icon-btn" data-action="theme" id="themeBtn" title="Switch theme" aria-label="Switch theme">◐</button>
+    <button class="icon-btn avatar" id="userBtn" data-goto="setup" aria-label="Account and family" hidden></button>
+  </div>
+</header>
+<main id="view"><noscript><div class="card">This app needs JavaScript.</div></noscript></main>
+<footer></footer>
+
+<dialog id="txDialog">
+  <form id="txForm" novalidate>
+    <h3>Add transaction</h3>
+    <div class="seg">
+      <label><input type="radio" name="kind" value="expense" checked><span>Expense</span></label>
+      <label><input type="radio" name="kind" value="income"><span>Income</span></label>
+    </div>
+    <label class="f">Amount<input class="amount-in" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00"></label>
+    <label class="f">Description<input name="desc" required placeholder="e.g. Monoprix, Netflix, Salary" autocomplete="off"></label>
+    <div class="row2">
+      <label class="f">Date<input name="date" type="date" required></label>
+      <label class="f">Category<select name="cat"></select></label>
+    </div>
+    <label class="f">Note (optional)<input name="note" autocomplete="off"></label>
+    <p id="txErr" class="formerr" role="alert" hidden></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn" data-action="closeAdd">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="loanDialog">
+  <form id="loanForm" novalidate>
+    <h3 id="loanTitle">Add loan</h3>
+    <div class="row2">
+      <label class="f">Name<input name="name" maxlength="80" placeholder="e.g. House – Crédit Agricole" autocomplete="off"></label>
+      <label class="f">Type<select name="kind"><option value="house">🏠 House</option><option value="car">🚗 Car</option><option value="other">💳 Other</option></select></label>
+    </div>
+    <div class="row2">
+      <label class="f">Amount borrowed<input name="principal" inputmode="decimal" autocomplete="off" placeholder="240 000"></label>
+      <label class="f">Interest rate (% a year)<input name="rate" inputmode="decimal" autocomplete="off" placeholder="3,40"></label>
+    </div>
+    <div class="row2">
+      <label class="f">First payment date<input name="start_date" type="date"></label>
+      <label class="f">Length in months<input name="term_months" inputmode="numeric" autocomplete="off" placeholder="300 = 25 years"></label>
+    </div>
+    <div class="row2">
+      <label class="f">Monthly payment <small>optional</small><input name="payment" inputmode="decimal" autocomplete="off" placeholder="calculated"></label>
+      <label class="f">Monthly insurance <small>optional</small><input name="insurance" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+    </div>
+    <label class="f">Text on your bank statement <small>optional, finds the real payments</small><input name="keyword" autocomplete="off" placeholder="e.g. PRET IMMO"></label>
+    <p class="small muted" id="loanHint" style="margin:0"></p>
+    <p id="loanErr" class="formerr" role="alert" hidden></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn" data-action="closeLoan">Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+<input type="file" id="restoreFile" accept=".json,application/json" hidden>
+<div id="toast" role="status"></div>
+</body>
+</html>

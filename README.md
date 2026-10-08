@@ -2,7 +2,7 @@
 
 A family budget web app: import your bank CSVs, see where the money goes, find the "leaks" (subscriptions, small purchases, rising categories), and follow your house and car loans down to the last payment.
 
-- **Family accounts**: everyone signs in with their own email and password and shares one family budget (transactions, budgets, loans).
+- **Shared budgets**: everyone signs in with their own email and password. A budget (transactions, budgets, loans) can be shared with several people, and one person can have several budgets, e.g. the family budget plus a holiday budget. Switch between them from the account menu at the top right.
 - **Loans & milestones**: enter a loan's contract details and see what you paid last year and over the last 12 months, the interest vs capital split, what you still owe, a year-by-year table for tax returns, and milestones (25 / 50 / 75 % repaid, turning point, last payment) with countdowns. Linked bank payments are checked against the schedule.
 - **Insights**: savings rate vs goal, recurring charges, small-purchase leak, over-budget and rising categories, top merchants, bank fees.
 - **Bank import**: CSV from French and other banks (`;` or `,`, `1 234,56`, debit/credit columns, Windows-1252), duplicate detection, rule-based auto-categorisation that learns from your corrections.
@@ -49,13 +49,15 @@ Notes about the free plan:
 
 `public/_headers` sends a strict Content-Security-Policy that only allows this site, the two pinned CDN libraries and the Supabase project in `config.js`. **If you change the Supabase project, update the `connect-src` line too.**
 
-### 3. Family
+### 3. Budgets and family
 
 1. The first person creates an account and chooses **Start a new family budget**.
-2. In **Budgets & settings → Family budget**, click **Copy invitation** and send it to your family.
+2. In **Budgets & settings → Budget & members**, click **Copy invitation** and send it to your family.
 3. Each family member creates an account and enters the invite code.
 
-The family owner can remove members and create a new invite code (the old one stops working).
+The account menu (your initial, top right) lists every budget you can open, with **+ New budget**, **Join a budget with a code** and **Sign out**.
+The owner of a budget can rename it, remove members, create a new invite code (the old one stops working) and delete the budget. Other members can leave it.
+**Clear this budget** (Budgets & settings → Your data) empties the open budget but keeps it and its members.
 
 ## Moving data from the single-file version
 
@@ -73,6 +75,6 @@ Add `?local` to the address (<http://localhost:8765/?local>) to try the app with
 ## Security model
 
 - The publishable key in `config.js` is public by design. Access is controlled in the database: every table has Row Level Security, so a signed-in user can only read and change rows of the family budget they belong to, and logged-out visitors can read nothing.
-- Families are created and joined only through the `create_household` / `join_household` functions; only a family's name, settings and version can be edited directly.
+- Budgets are created, joined and deleted only through the `create_household`, `join_household` and `delete_household` functions; only a budget's name, settings and version can be edited directly.
 - Passwords are handled by Supabase Auth and never touch this code.
 - External scripts are pinned to exact versions with Subresource Integrity hashes.

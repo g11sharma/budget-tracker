@@ -3,8 +3,8 @@
 -- Run this whole file once in Supabase → SQL Editor → New query → Run.
 -- It is safe to run again: it only creates what is missing and refreshes functions and policies.
 --
--- Model: one shared "household" (family budget) per user. Every family member has their own
--- login, and all members of a household can read and edit its transactions, loans and settings.
+-- Model: a "household" is one shared budget. Every person has their own login and can belong to
+-- several budgets; all members of a budget can read and edit its transactions, loans and settings.
 -- Row Level Security makes sure nobody can see another household's data, even though the
 -- publishable key is public in the website code.
 
@@ -22,13 +22,17 @@ create table if not exists public.households (
 
 create table if not exists public.household_members (
   household_id uuid not null references public.households(id) on delete cascade,
-  user_id      uuid not null unique references auth.users(id) on delete cascade,  -- one family per user
+  user_id      uuid not null references auth.users(id) on delete cascade,
   role         text not null default 'member' check (role in ('owner', 'member')),
   display_name text,
   email        text,
   joined_at    timestamptz not null default now(),
   primary key (household_id, user_id)
 );
+
+-- upgrade from the first version, which allowed only one budget per user
+alter table public.household_members drop constraint if exists household_members_user_id_key;
+create index if not exists household_members_user on public.household_members (user_id);
 
 create table if not exists public.transactions (
   id           uuid primary key default gen_random_uuid(),
@@ -80,9 +84,6 @@ language plpgsql security definer set search_path = public as $$
 declare hid uuid;
 begin
   if auth.uid() is null then raise exception 'Please sign in first'; end if;
-  if exists (select 1 from household_members where user_id = auth.uid()) then
-    raise exception 'You already belong to a family budget';
-  end if;
   insert into households (name, created_by)
   values (coalesce(nullif(left(trim(p_name), 80), ''), 'Family budget'), auth.uid())
   returning id into hid;
@@ -96,25 +97,33 @@ language plpgsql security definer set search_path = public as $$
 declare hid uuid;
 begin
   if auth.uid() is null then raise exception 'Please sign in first'; end if;
-  if exists (select 1 from household_members where user_id = auth.uid()) then
-    raise exception 'You already belong to a family budget';
-  end if;
   select id into hid from households where invite_code = upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
   if hid is null then raise exception 'That invite code was not found — check it with the person who sent it'; end if;
+  if exists (select 1 from household_members where household_id = hid and user_id = auth.uid()) then
+    raise exception 'You are already a member of this budget';
+  end if;
   insert into household_members (household_id, user_id, role, display_name, email)
   values (hid, auth.uid(), 'member', auth.jwt() -> 'user_metadata' ->> 'name', auth.jwt() ->> 'email');
   return hid;
 end $$;
 
-create or replace function public.new_invite_code() returns text
+drop function if exists public.new_invite_code();   -- first version: one budget per user
+create or replace function public.new_invite_code(p_household uuid) returns text
 language plpgsql security definer set search_path = public as $$
 declare code text;
 begin
+  if not public.is_owner(p_household) then raise exception 'Only the owner of this budget can do this'; end if;
   update households set invite_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10))
-  where id = (select household_id from household_members where user_id = auth.uid() and role = 'owner')
-  returning invite_code into code;
-  if code is null then raise exception 'Only the person who created the family budget can do this'; end if;
+  where id = p_household returning invite_code into code;
   return code;
+end $$;
+
+-- deletes the budget with all its members, transactions and loans (foreign keys cascade)
+create or replace function public.delete_household(p_household uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner(p_household) then raise exception 'Only the owner of this budget can delete it'; end if;
+  delete from households where id = p_household;
 end $$;
 
 -- ─────────────────────────────── row level security ───────────────────────────────
@@ -166,6 +175,6 @@ grant select, delete on public.household_members to authenticated;
 grant select, insert, update, delete on public.transactions, public.loans to authenticated;
 
 revoke all on function public.is_member(uuid), public.is_owner(uuid), public.create_household(text),
-  public.join_household(text), public.new_invite_code() from public, anon;
+  public.join_household(text), public.new_invite_code(uuid), public.delete_household(uuid) from public, anon;
 grant execute on function public.is_member(uuid), public.is_owner(uuid), public.create_household(text),
-  public.join_household(text), public.new_invite_code() to authenticated;
+  public.join_household(text), public.new_invite_code(uuid), public.delete_household(uuid) to authenticated;

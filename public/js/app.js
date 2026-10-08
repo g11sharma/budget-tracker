@@ -298,7 +298,7 @@ const onlyDemoData = () => hasDemoData() && state.txns.every(t => t.src === 'dem
 function demoBanner(){
   if (!hasDemoData()) return '';
   return onlyDemoData()
-    ? `<div class="banner info"><span>You're exploring <b>demo data</b>. When you're ready, start your own budget from scratch.</span><button class="btn primary" data-action="newBudget">Start my real budget</button></div>`
+    ? `<div class="banner info"><span>You're exploring <b>demo data</b>. When you're ready, start your own budget from scratch.</span><button class="btn primary" data-action="clearBudget">Start my real budget</button></div>`
     : `<div class="banner info"><span>Your budget still contains <b>demo data</b> next to your own.</span><button class="btn" data-action="removeDemo">Remove demo data</button></div>`;
 }
 // A clean slate: default categories and rules, but no budget amounts, no transactions and no loans.
@@ -678,7 +678,7 @@ function renderSetup(){
         <button class="btn" data-action="restore">Restore backup</button>
         <button class="btn" data-action="exportCSV">Export transactions (.csv)</button>
         ${hasDemoData() ? '<button class="btn" data-action="removeDemo">Remove demo data</button>' : '<button class="btn" data-action="demo">Load demo data</button>'}
-        <button class="btn danger" data-action="newBudget">Start a new budget</button>
+        <button class="btn danger" data-action="clearBudget">Clear this budget</button>
       </div>
       <p class="small muted" style="margin:12px 0 0">${cloud() ? 'Everything is stored in your private Supabase database and shared only with the members of your family budget. Moving over from the old single-file version? Export a backup there and use "Restore backup" here.' : 'Local mode: data is stored only in this browser. To use the app on your phone and computer, export a backup on one and restore it on the other.'}</p>
     </div>
@@ -692,15 +692,16 @@ function updateRules(){
 }
 function familyCard(){
   const H = Store.household, me = Store.user, owner = H.role === 'owner';
-  return `<div class="card"><h2>Family budget</h2><p class="sub">Everyone below sees and edits the same transactions, budgets and loans.</p>
+  return `<div class="card"><h2>Budget &amp; members</h2><p class="sub">Everyone below sees and edits the same transactions, budgets and loans in this budget.${Store.households.length > 1 ? ' Switch budgets from the menu at the top right.' : ''}</p>
     <div class="setrow" style="align-items:flex-end;margin-bottom:14px">
-      <label class="field">Name<input class="inp" id="hhName" value="${esc(H.name)}" maxlength="80" ${owner ? '' : 'disabled'}></label>
+      <label class="field">Budget name<input class="inp" id="hhName" value="${esc(H.name)}" maxlength="80" ${owner ? '' : 'disabled'}></label>
       <div class="field">Invite code<div class="btnrow" style="align-items:center"><code class="invite">${esc(H.invite_code)}</code><button class="btn" data-action="copyInvite">Copy invitation</button>${owner ? '<button class="btn" data-action="newInvite" title="The old code stops working">New code</button>' : ''}</div></div>
     </div>
     <p class="small muted" style="margin:0 0 12px">To add someone: send them the invitation. They create an account on this website, then enter the code.</p>
     <table>${Store.members.map(m => `<tr><td><b>${esc(m.display_name || (m.email || '').split('@')[0])}</b>${m.user_id === me.id ? ' <span class="pill">you</span>' : ''}<div class="small muted">${esc(m.email || '')}</div></td>
       <td class="num">${m.role === 'owner' ? '<span class="pill good">owner</span>' : ''}</td>
       <td class="num">${m.user_id === me.id ? (owner ? '' : '<button class="btn danger" data-action="leaveFamily">Leave</button>') : owner ? `<button class="btn danger" data-action="removeMember" data-id="${esc(m.user_id)}">Remove</button>` : ''}</td></tr>`).join('')}</table>
+    ${owner ? `<p class="small muted" style="margin:14px 0 8px">Deleting the budget removes it for every member, with all its transactions and loans.</p><button class="btn danger" data-action="deleteBudget">Delete this budget</button>` : ''}
   </div>`;
 }
 function accountCard(){
@@ -841,9 +842,9 @@ async function onGateSubmit(form){
     else if (kind === 'recovery'){
       if (f.elements.password.value.length < 8) throw new Error('Use at least 8 characters for your password.');
       await Store.updatePassword(f.elements.password.value); toast('Password updated');
-      return (await Store.loadHousehold()) ? startApp() : renderGate('household');
+      return (await Store.loadHouseholds()) ? startApp() : renderGate('household');
     }
-    else if (kind === 'createFamily'){ await Store.createHousehold(val('name')); toast('Family budget created — share the invite code from Settings'); return startApp(); }
+    else if (kind === 'createFamily'){ await Store.createHousehold(val('name')); toast('Budget created — invite your family from Settings & members'); return startApp(); }
     else if (kind === 'joinFamily'){ await Store.joinHousehold(val('code')); toast(`You joined ${Store.household.name}`); return startApp(); }
     else if (kind === 'changePassword'){
       if (f.elements.password.value.length < 8) throw new Error('Use at least 8 characters for your password.');
@@ -873,13 +874,30 @@ function renderChrome(){
   const u = Store.user, av = $('#userBtn');
   if (cloud() && u){
     av.hidden = false; av.textContent = (u.name || u.email || '?').trim().slice(0, 1).toUpperCase(); av.title = `${u.name} · ${Store.household.name}`;
-    $('#menuName').textContent = u.name; $('#menuEmail').textContent = u.email; $('#menuFamily').textContent = Store.household.name;
+    renderUserMenu();
   }
   else av.hidden = true;
   $('footer').innerHTML = cloud()
     ? `Signed in as ${esc(u.name)} · ${esc(Store.household.name)}. Your data is stored in your family's private database. <a href="#setup">Export a backup</a> now and then.`
     : `Local mode: your data is saved only in this browser on this device. <a href="#setup">Export a backup</a> regularly, and use it to move your data to another device.`;
   updateSync();
+}
+// Account menu: who is signed in, every budget they can open (✓ = the one on screen), and account actions
+function renderUserMenu(){
+  const u = Store.user, cur = Store.household;
+  $('#userMenu').innerHTML = `<div class="who"><b>${esc(u.name)}</b><small>${esc(u.email)}</small></div>
+    <div class="menulabel">Your budgets</div>
+    ${Store.households.map(h => `<button type="button" role="menuitemradio" aria-checked="${h.id === cur.id}" data-action="switchBudget" data-id="${esc(h.id)}"><span class="tick" aria-hidden="true">${h.id === cur.id ? '✓' : ''}</span><span class="bname">${esc(h.name)}${h.role === 'owner' ? '' : '<small>shared with you</small>'}</span></button>`).join('')}
+    <button type="button" role="menuitem" data-action="createBudget"><span class="tick" aria-hidden="true">+</span>New budget</button>
+    <button type="button" role="menuitem" data-action="joinBudget"><span class="tick" aria-hidden="true"></span>Join a budget with a code</button>
+    <div class="sep"></div>
+    <button type="button" role="menuitem" data-goto="setup">Settings &amp; members</button>
+    <button type="button" role="menuitem" data-action="signOut" class="out">Sign out</button>`;
+}
+// After the budget on screen changed (switched, created, joined, left or deleted): load it, or ask to set one up
+function openCurrentBudget(msg){
+  if (msg) toast(msg);
+  return Store.household ? startApp() : renderGate('household');
 }
 function updateSync(){
   const el = $('#sync'), s = Store.status;
@@ -904,7 +922,7 @@ Store.on('signedOut', () => location.reload());
 /* ============================== events ============================== */
 function setUserMenu(open){
   $('#userMenu').hidden = !open; $('#userBtn').setAttribute('aria-expanded', String(open));
-  if (open) $('#userMenu [role=menuitem]').focus();
+  if (open) ($('#userMenu [aria-checked=true]') || $('#userMenu [role=menuitem]')).focus();
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#userMenu').hidden){ setUserMenu(false); $('#userBtn').focus(); } });
 document.addEventListener('click', e => {
@@ -946,15 +964,16 @@ document.addEventListener('click', e => {
       const txt = s => /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
       const rows = [['Date','Description','Amount','Category','Type','Note']].concat(state.txns.slice().sort((x,y) => x.date.localeCompare(y.date)).map(t => [t.date, txt(t.desc), t.amount.toFixed(2), txt(catOf(t.cat).name), catOf(t.cat).type, txt(t.note || '')]));
       download(`transactions-${todayISO()}.csv`, '\uFEFF' + rows.map(r => r.map(x => /[",;\n]/.test(String(x)) ? '"' + String(x).replace(/"/g, '""') + '"' : x).join(',')).join('\n'), 'text/csv'); break; }
-    case 'newBudget': {
-      const ok = onlyDemoData()
+    case 'clearBudget': {
+      const demo = onlyDemoData();
+      const ok = demo
         ? confirm('Remove the demo data and start your own budget from scratch?')
-        : confirm(`Start a new budget${cloud() ? ` for everyone in "${Store.household.name}"` : ''}? All transactions, loans, budgets, categories and rules are deleted and you start again from a clean slate. Your account${cloud() ? ' and family members are' : ' is'} kept.\n\nIf you might want this data later, click Cancel and use "Export backup" first.`)
-          && confirm('Really start over? This cannot be undone.');
+        : confirm(`Clear ${cloud() ? `"${Store.household.name}" for everyone in it` : 'this budget'}? All transactions, loans, budgets, categories and rules are deleted and it starts again from a clean slate.${cloud() ? ' Its members are kept.' : ''}\n\n${cloud() ? 'To keep this data and start a separate budget instead, click Cancel and choose "+ New budget" in the menu at the top right. ' : ''}If you might want this data later, click Cancel and use "Export backup" first.`)
+          && confirm('Really clear it? This cannot be undone.');
       if (!ok) break;
       state = freshState(); Store.replaceAll(); save();
       ui.month = curMonth(); ui.tx = {month:null, cat:'', q:''}; ui.imp = null;
-      toast('New budget started — import a bank CSV or add your first expense'); go('dashboard'); break; }
+      toast(demo ? 'Demo data removed — import a bank CSV or add your first expense' : 'Budget cleared — import a bank CSV or add your first expense'); go('dashboard'); break; }
     case 'suggestBudgets': { const avg = avgSpend(ui.month, 3); let n = 0; state.categories.forEach(c => { if (c.type === 'expense' && !['uncat','loans'].includes(c.id) && avg[c.id] > 0){ c.budget = Math.max(10, Math.round(avg[c.id] * .9 / 10) * 10); n++; } }); if (!n){ toast('Need some spending data first'); break; } save(); toast(`Set ${n} budgets to 90% of your 3-month average`); render(); break; }
     case 'addCat': { const name = prompt('New category name'); if (!name || !name.trim()) break; const id = 'c_' + uid().slice(0, 8); state.categories.push({id, name: name.trim().slice(0, 60), color: '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0'), type:'expense', budget:0}); save(); render(); break; }
     case 'delCat': { const c = catOf(a.dataset.id); if (PROTECTED_CATS.has(c.id)) break; const n = state.txns.filter(t => t.cat === c.id).length; if (!confirm(`Delete category "${c.name}"?${n ? ` Its ${n} transactions become Uncategorized.` : ''}`)) break; state.txns.forEach(t => { if (t.cat === c.id) t.cat = 'uncat'; }); state.rules = state.rules.filter(r => r.cat !== c.id); state.categories = state.categories.filter(x => x.id !== c.id); save(); render(); break; }
@@ -966,11 +985,26 @@ document.addEventListener('click', e => {
     case 'delLoan': deleteLoan(a.dataset.id); break;
     case 'closeLoan': $('#loanDialog').close(); break;
     case 'copyInvite': {
-      const H = Store.household, text = `Join our family budget "${H.name}": open ${location.origin + location.pathname}, create an account, then enter the invite code ${H.invite_code}`;
-      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('Invitation copied — paste it in a message to your family'), () => prompt('Copy this invitation:', text)); break; }
+      const H = Store.household, text = `Join our budget "${H.name}": open ${location.origin + location.pathname}, create an account, then enter the invite code ${H.invite_code}`;
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('Invitation copied — paste it in a message'), () => prompt('Copy this invitation:', text)); break; }
     case 'newInvite': if (confirm('Create a new invite code? The current code will stop working.')) Store.newInviteCode().then(() => { toast('New invite code created'); render(); }, err => toast(friendly(err), true)); break;
-    case 'removeMember': { const m = Store.members.find(x => x.user_id === a.dataset.id); if (m && confirm(`Remove ${m.display_name || m.email} from the family budget? They will no longer see any of its data.`)) Store.removeMember(m.user_id).then(() => { toast('Removed'); render(); }, err => toast(friendly(err), true)); break; }
-    case 'leaveFamily': if (confirm(`Leave "${Store.household.name}"? You will no longer see its data.`)) Store.flush().then(() => Store.removeMember(Store.user.id)).then(() => location.reload(), err => toast(friendly(err), true)); break;
+    case 'removeMember': { const m = Store.members.find(x => x.user_id === a.dataset.id); if (m && confirm(`Remove ${m.display_name || m.email} from "${Store.household.name}"? They will no longer see any of its data.`)) Store.removeMember(m.user_id).then(() => { toast('Removed'); render(); }, err => toast(friendly(err), true)); break; }
+    case 'leaveFamily': { const name = Store.household.name; if (confirm(`Leave "${name}"? You will no longer see its data.`)) Store.removeMember(Store.user.id).then(() => openCurrentBudget(`You left ${name}`), err => toast(friendly(err), true)); break; }
+    case 'switchBudget': {
+      if (a.dataset.id === Store.household.id) break;
+      Store.switchHousehold(a.dataset.id).then(h => openCurrentBudget(`Opened ${h.name}`), err => toast(friendly(err), true)); break; }
+    case 'createBudget': {
+      const name = prompt('Name of the new budget (for example "Holiday 2027" or "Our flat")');
+      if (!name || !name.trim()) break;
+      Store.createHousehold(name.trim().slice(0, 80)).then(() => openCurrentBudget('New budget created — invite others from Settings & members'), err => toast(friendly(err), true)); break; }
+    case 'joinBudget': {
+      const code = prompt('Enter the invite code you received');
+      if (!code || !code.trim()) break;
+      Store.joinHousehold(code).then(h => openCurrentBudget(`You joined ${h.name}`), err => toast(friendly(err), true)); break; }
+    case 'deleteBudget': {
+      const name = Store.household.name;
+      if (!confirm(`Delete the budget "${name}" for everyone in it? All its transactions, loans and settings are permanently deleted.`) || !confirm(`Really delete "${name}"? This cannot be undone.`)) break;
+      Store.deleteHousehold().then(() => openCurrentBudget(`Deleted ${name}`), err => toast(friendly(err), true)); break; }
   }
 });
 document.addEventListener('submit', e => {

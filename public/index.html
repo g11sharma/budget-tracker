@@ -34,11 +34,7 @@
     <button class="icon-btn" data-action="theme" id="themeBtn" title="Switch theme" aria-label="Switch theme">◐</button>
     <div class="usermenu">
       <button class="icon-btn avatar" id="userBtn" data-action="userMenu" aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu" aria-label="Account menu" hidden></button>
-      <div class="menu" id="userMenu" role="menu" hidden>
-        <div class="who"><b id="menuName"></b><small id="menuEmail"></small><small id="menuFamily"></small></div>
-        <button type="button" role="menuitem" data-goto="setup">Account &amp; family</button>
-        <button type="button" role="menuitem" data-action="signOut" class="out">Sign out</button>
-      </div>
+      <div class="menu" id="userMenu" role="menu" aria-label="Account and budgets" hidden></div>
     </div>
   </div>
 </header>

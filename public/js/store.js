@@ -14,8 +14,9 @@ const Store = (() => {
   const initialHash = location.hash;   // read before supabase-js consumes the auth tokens in it
 
   let sb = null, getState = () => null;
-  let user = null, household = null, members = [];
+  let user = null, household = null, households = [], members = [];
   let synced = emptySynced(), wipeRemote = false;
+  let loadedFor = null;   // id of the budget whose data is in `state`; nothing is saved while it differs from `household`
   let timer = null, running = null, dirty = false, status = mode === 'cloud' ? 'saved' : 'local', lastError = null, lastLoad = 0;
   const listeners = {status: [], remote: [], signedOut: []};
   const emit = (k, ...a) => listeners[k].forEach(f => { try { f(...a); } catch (e) { console.error(e); } });
@@ -64,12 +65,12 @@ const Store = (() => {
     if (!data.session) return {screen: 'signin', message: hashParams.get('error_description') ? hashParams.get('error_description').replace(/\+/g, ' ') : ''};
     user = toUser(data.session.user);
     if (recovery) return {screen: 'recovery'};
-    await loadHousehold();
+    await loadHouseholds();
     return {screen: household ? 'app' : 'household'};
   }
   async function signIn(email, password){
     const {data, error} = await sb.auth.signInWithPassword({email, password}); fail(error);
-    user = toUser(data.user); await loadHousehold();
+    user = toUser(data.user); await loadHouseholds();
     return household ? 'app' : 'household';
   }
   async function signUp(name, email, password){
@@ -81,26 +82,50 @@ const Store = (() => {
   async function updatePassword(password){ const {error} = await sb.auth.updateUser({password}); fail(error); }
   async function signOut(){ if (sb) { user = null; await sb.auth.signOut(); } }
 
-  /* ---------- family (household) ---------- */
-  async function loadHousehold(){
-    const {data, error} = await sb.from('household_members').select('role, households(id, name, invite_code)').eq('user_id', user.id).maybeSingle(); fail(error);
-    household = data && data.households ? {...data.households, role: data.role} : null;
-    if (household) await loadMembers();
+  /* ---------- budgets (households) ---------- */
+  const currentKey = () => 'moneyLeakTracker.budget.' + user.id;
+  // Every budget this user can open; the current one is `prefer`, else the last one used here, else the oldest.
+  async function loadHouseholds(prefer){
+    const {data, error} = await sb.from('household_members').select('role, joined_at, households(id, name, invite_code)').eq('user_id', user.id).order('joined_at'); fail(error);
+    households = (data || []).filter(r => r.households).map(r => ({...r.households, role: r.role}));
+    let saved = null; try { saved = localStorage.getItem(currentKey()); } catch (e) {}
+    household = households.find(h => h.id === prefer) || households.find(h => h.id === saved) || households[0] || null;
+    synced = emptySynced(); wipeRemote = false; loadedFor = null;
+    if (household){ remember(); await loadMembers(); } else members = [];
     return household;
   }
+  function remember(){ try { localStorage.setItem(currentKey(), household.id); } catch (e) {} }
   async function loadMembers(){
     const {data, error} = await sb.from('household_members').select('user_id, role, display_name, email, joined_at').eq('household_id', household.id).order('joined_at'); fail(error);
     members = data || [];
     return members;
   }
-  async function createHousehold(name){ const {error} = await sb.rpc('create_household', {p_name: name}); fail(error); return loadHousehold(); }
-  async function joinHousehold(code){ const {error} = await sb.rpc('join_household', {p_code: code}); fail(error); return loadHousehold(); }
-  async function newInviteCode(){ const {data, error} = await sb.rpc('new_invite_code'); fail(error); household.invite_code = data; return data; }
+  // Unsaved changes belong to the budget they were made in, so push them before opening another one.
+  async function saveFirst(){ if (household && !(await flush())) throw new Error('Your last changes are not saved yet. Check your connection and try again.'); }
+  async function switchHousehold(id){
+    await saveFirst();
+    const h = households.find(x => x.id === id); if (!h) throw new Error('Budget not found');
+    household = h; synced = emptySynced(); wipeRemote = false; loadedFor = null; remember();
+    await loadMembers();
+    return household;
+  }
+  async function createHousehold(name){ await saveFirst(); const {data, error} = await sb.rpc('create_household', {p_name: name}); fail(error); return loadHouseholds(data); }
+  async function joinHousehold(code){ await saveFirst(); const {data, error} = await sb.rpc('join_household', {p_code: code}); fail(error); return loadHouseholds(data); }
+  async function newInviteCode(){ const {data, error} = await sb.rpc('new_invite_code', {p_household: household.id}); fail(error); household.invite_code = data; return data; }
   async function renameHousehold(name){ const {error} = await sb.from('households').update({name}).eq('id', household.id); fail(error); household.name = name; }
+  async function deleteHousehold(){
+    clearTimeout(timer); dirty = false; while (running) await running;   // nothing left to save in a budget being deleted
+    const {error} = await sb.rpc('delete_household', {p_household: household.id}); fail(error);
+    try { localStorage.removeItem(currentKey()); } catch (e) {}
+    return loadHouseholds();
+  }
+  // Leave the current budget (userId = you) or, as its owner, remove someone else from it.
   async function removeMember(userId){
+    if (userId === user.id) await saveFirst();
     const {data, error} = await sb.from('household_members').delete().eq('household_id', household.id).eq('user_id', userId).select('user_id'); fail(error);
     if (!data || !data.length) throw new Error('Not allowed');
-    if (userId !== user.id) await loadMembers();
+    if (userId === user.id){ try { localStorage.removeItem(currentKey()); } catch (e) {} return loadHouseholds(); }
+    await loadMembers();
   }
 
   /* ---------- loading ---------- */
@@ -131,7 +156,7 @@ const Store = (() => {
     loans.forEach(l => synced.loans.set(l.id, loanSnap(l)));
     synced.config = hh.data.config ? stable(hh.data.config) : null;
     synced.version = hh.data.config_version;
-    lastLoad = Date.now();
+    lastLoad = Date.now(); loadedFor = household.id;
     return {...(hh.data.config || {}), txns, loans};
   }
 
@@ -142,11 +167,14 @@ const Store = (() => {
       catch (e) { setStatus('error', e); }
       return;
     }
+    if (!household || loadedFor !== household.id) return;   // another budget is being opened: its data isn't loaded yet
     dirty = true; setStatus('saving');
     clearTimeout(timer); timer = setTimeout(kick, 400);
   }
   function kick(){
-    if (running) return;
+    // With nothing to send the loop below would finish synchronously, clearing `running` before it is even
+    // assigned, and a settled promise would then stay in `running` forever (saving stops, flush() spins).
+    if (running || !dirty) return;
     running = (async () => {
       try { while (dirty) { dirty = false; await push(); } setStatus('saved'); }
       catch (e) { dirty = true; console.error(e); setStatus('error', e); }
@@ -165,6 +193,7 @@ const Store = (() => {
 
   async function push(){
     const s = getState(), hid = household.id;
+    if (loadedFor !== hid) return;
     if (wipeRemote){
       for (const t of ['transactions', 'loans']) { const {error} = await sb.from(t).delete().eq('household_id', hid); fail(error); }
       synced.txns.clear(); synced.loans.clear(); wipeRemote = false;
@@ -202,11 +231,11 @@ const Store = (() => {
 
   return {
     mode, init, signIn, signUp, sendReset, updatePassword, signOut,
-    loadHousehold, createHousehold, joinHousehold, newInviteCode, renameHousehold, removeMember, loadMembers,
+    loadHouseholds, switchHousehold, createHousehold, joinHousehold, newInviteCode, renameHousehold, deleteHousehold, removeMember, loadMembers,
     loadData, save, flush, replaceAll,
     bind(fn){ getState = fn; },
     on(k, fn){ listeners[k].push(fn); },
-    get user(){ return user; }, get household(){ return household; }, get members(){ return members; },
+    get user(){ return user; }, get household(){ return household; }, get households(){ return households; }, get members(){ return members; },
     get status(){ return status; }, get lastError(){ return lastError; }, get lastLoad(){ return lastLoad; },
     get pending(){ return dirty || !!running; }
   };

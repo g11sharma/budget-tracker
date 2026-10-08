@@ -4,6 +4,7 @@ A family budget web app: import your bank CSVs, see where the money goes, find t
 
 - **Shared budgets**: everyone signs in with their own email and password. A budget (transactions, budgets, loans) can be shared with several people, and one person can have several budgets, e.g. the family budget plus a holiday budget. Switch between them from the account menu at the top right.
 - **Loans & milestones**: enter a loan's contract details and see what you paid last year and over the last 12 months, the interest vs capital split, what you still owe, a year-by-year table for tax returns, and milestones (25 / 50 / 75 % repaid, turning point, last payment) with countdowns. Linked bank payments are checked against the schedule.
+- **English and French**: a FR / EN button on every screen switches the whole app, including dates and amounts (`8 oct. 2026`, `1 234 €`). Built-in category names follow the language until you rename them. First visit uses the browser's language.
 - **Insights**: savings rate vs goal, recurring charges, small-purchase leak, over-budget and rising categories, top merchants, bank fees.
 - **Bank import**: CSV from French and other banks (`;` or `,`, `1 234,56`, debit/credit columns, Windows-1252), duplicate detection, rule-based auto-categorisation that learns from your corrections.
 - **Your data**: stored in your own Supabase Postgres database, protected by Row Level Security. Full history is kept (optional 2 / 3 / 5-year limit). JSON backup & restore, CSV export.
@@ -17,6 +18,7 @@ public/            the website (what Netlify serves)
   index.html
   css/style.css
   js/config.js     Supabase URL + publishable key
+  js/i18n.js       English/French texts (English is the key, FR holds the French)
   js/store.js      data layer: login, family, sync with the database (or localStorage)
   js/loans.js      loan maths, Loans tab, loan dialog
   js/app.js        everything else: dashboard, insights, import, settings

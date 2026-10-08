@@ -50,7 +50,7 @@ const Store = (() => {
 
   async function init(){
     if (mode === 'local') return {screen: 'app'};
-    if (!window.supabase || !window.supabase.createClient) return {screen: 'error', message: 'The login service could not be loaded. Check your internet connection, then reload the page.'};
+    if (!window.supabase || !window.supabase.createClient) return {screen: 'error', message: tr('The login service could not be loaded. Check your internet connection, then reload the page.')};
     const hashParams = new URLSearchParams(initialHash.slice(1));
     let recovery = hashParams.get('type') === 'recovery';
     sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit'}});
@@ -101,10 +101,10 @@ const Store = (() => {
     return members;
   }
   // Unsaved changes belong to the budget they were made in, so push them before opening another one.
-  async function saveFirst(){ if (household && !(await flush())) throw new Error('Your last changes are not saved yet. Check your connection and try again.'); }
+  async function saveFirst(){ if (household && !(await flush())) throw new Error(tr('Your last changes are not saved yet. Check your connection and try again.')); }
   async function switchHousehold(id){
     await saveFirst();
-    const h = households.find(x => x.id === id); if (!h) throw new Error('Budget not found');
+    const h = households.find(x => x.id === id); if (!h) throw new Error(tr('Budget not found'));
     household = h; synced = emptySynced(); wipeRemote = false; loadedFor = null; remember();
     await loadMembers();
     return household;
@@ -123,7 +123,7 @@ const Store = (() => {
   async function removeMember(userId){
     if (userId === user.id) await saveFirst();
     const {data, error} = await sb.from('household_members').delete().eq('household_id', household.id).eq('user_id', userId).select('user_id'); fail(error);
-    if (!data || !data.length) throw new Error('Not allowed');
+    if (!data || !data.length) throw new Error(tr('You are not allowed to do this.'));
     if (userId === user.id){ try { localStorage.removeItem(currentKey()); } catch (e) {} return loadHouseholds(); }
     await loadMembers();
   }

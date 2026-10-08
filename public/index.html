@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Money Leak Tracker</title>
-<meta name="description" content="Family budget: spending, savings leaks, loans and milestones.">
+<meta name="description" content="Family budget: spending, savings leaks, loans and milestones. Budget familial : dépenses, fuites d’argent, prêts et étapes.">
 <meta name="theme-color" content="#0f766e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Money Tracker">
@@ -13,52 +13,54 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js" integrity="sha256-84flk1cwptlZmigZhqF26vzl6751FERiItIaoCnjHdU=" crossorigin="anonymous" defer></script>
 <script src="js/config.js" defer></script>
+<script src="js/i18n.js" defer></script>
 <script src="js/store.js" defer></script>
 <script src="js/loans.js" defer></script>
 <script src="js/app.js" defer></script>
 </head>
 <body class="gate">
 <header class="top">
-  <div class="brand"><span class="logo">€</span><div><strong>Money Leak Tracker</strong><small>Family spending, savings &amp; loans</small></div></div>
+  <div class="brand"><span class="logo">€</span><div><strong>Money Leak Tracker</strong><small data-i18n="Family spending, savings & loans">Family spending, savings &amp; loans</small></div></div>
   <nav id="tabs">
-    <button data-tab="dashboard">Dashboard</button>
-    <button data-tab="insights">Leaks &amp; savings</button>
-    <button data-tab="loans">Loans</button>
-    <button data-tab="transactions">Transactions</button>
-    <button data-tab="import">Import</button>
-    <button data-tab="setup">Budgets &amp; settings</button>
+    <button data-tab="dashboard" data-i18n="Dashboard">Dashboard</button>
+    <button data-tab="insights" data-i18n="Leaks & savings">Leaks &amp; savings</button>
+    <button data-tab="loans" data-i18n="Loans">Loans</button>
+    <button data-tab="transactions" data-i18n="Transactions">Transactions</button>
+    <button data-tab="import" data-i18n="Import">Import</button>
+    <button data-tab="setup" data-i18n="Budgets & settings">Budgets &amp; settings</button>
   </nav>
   <div class="actions">
     <button class="sync" id="sync" type="button" hidden></button>
-    <button class="btn primary" data-action="openAdd">+ Add</button>
-    <button class="icon-btn" data-action="theme" id="themeBtn" title="Switch theme" aria-label="Switch theme">◐</button>
+    <button class="btn primary" data-action="openAdd" data-i18n="+ Add">+ Add</button>
+    <button class="icon-btn lang" data-action="lang" id="langBtn" type="button">FR</button>
+    <button class="icon-btn" data-action="theme" id="themeBtn" title="Switch theme" data-i18n-aria="Switch theme" aria-label="Switch theme">◐</button>
     <div class="usermenu">
-      <button class="icon-btn avatar" id="userBtn" data-action="userMenu" aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu" aria-label="Account menu" hidden></button>
-      <div class="menu" id="userMenu" role="menu" aria-label="Account and budgets" hidden></div>
+      <button class="icon-btn avatar" id="userBtn" data-action="userMenu" aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu" data-i18n-aria="Account menu" aria-label="Account menu" hidden></button>
+      <div class="menu" id="userMenu" role="menu" data-i18n-aria="Account and budgets" aria-label="Account and budgets" hidden></div>
     </div>
   </div>
 </header>
-<main id="view"><noscript><div class="card">This app needs JavaScript.</div></noscript></main>
+<main id="view"><noscript><div class="card">This app needs JavaScript. / Cette application nécessite JavaScript.</div></noscript></main>
 <footer></footer>
 
 <dialog id="txDialog">
   <form id="txForm" novalidate>
-    <h3>Add transaction</h3>
+    <h3 data-i18n="Add transaction">Add transaction</h3>
     <div class="seg">
-      <label><input type="radio" name="kind" value="expense" checked><span>Expense</span></label>
-      <label><input type="radio" name="kind" value="income"><span>Income</span></label>
+      <label><input type="radio" name="kind" value="expense" checked><span data-i18n="Expense">Expense</span></label>
+      <label><input type="radio" name="kind" value="income"><span data-i18n="Income">Income</span></label>
     </div>
-    <label class="f">Amount<input class="amount-in" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00"></label>
-    <label class="f">Description<input name="desc" required placeholder="e.g. Monoprix, Netflix, Salary" autocomplete="off"></label>
+    <label class="f"><span data-i18n="Amount">Amount</span><input class="amount-in" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00"></label>
+    <label class="f"><span data-i18n="Description">Description</span><input name="desc" required data-i18n-ph="e.g. Monoprix, Netflix, Salary" placeholder="e.g. Monoprix, Netflix, Salary" autocomplete="off"></label>
     <div class="row2">
-      <label class="f">Date<input name="date" type="date" required></label>
-      <label class="f">Category<select name="cat"></select></label>
+      <label class="f"><span data-i18n="Date">Date</span><input name="date" type="date" required></label>
+      <label class="f"><span data-i18n="Category">Category</span><select name="cat"></select></label>
     </div>
-    <label class="f">Note (optional)<input name="note" autocomplete="off"></label>
+    <label class="f"><span data-i18n="Note (optional)">Note (optional)</span><input name="note" autocomplete="off"></label>
     <p id="txErr" class="formerr" role="alert" hidden></p>
     <div class="dlg-actions">
-      <button type="button" class="btn" data-action="closeAdd">Cancel</button>
-      <button type="submit" class="btn primary">Save</button>
+      <button type="button" class="btn" data-action="closeAdd" data-i18n="Cancel">Cancel</button>
+      <button type="submit" class="btn primary" data-i18n="Save">Save</button>
     </div>
   </form>
 </dialog>
@@ -67,27 +69,27 @@
   <form id="loanForm" novalidate>
     <h3 id="loanTitle">Add loan</h3>
     <div class="row2">
-      <label class="f">Name<input name="name" maxlength="80" placeholder="e.g. House – Crédit Agricole" autocomplete="off"></label>
-      <label class="f">Type<select name="kind"><option value="house">🏠 House</option><option value="car">🚗 Car</option><option value="other">💳 Other</option></select></label>
+      <label class="f"><span data-i18n="Name">Name</span><input name="name" maxlength="80" data-i18n-ph="e.g. House – Crédit Agricole" placeholder="e.g. House – Crédit Agricole" autocomplete="off"></label>
+      <label class="f"><span data-i18n="Type">Type</span><select name="kind"><option value="house" data-i18n="🏠 House">🏠 House</option><option value="car" data-i18n="🚗 Car">🚗 Car</option><option value="other" data-i18n="💳 Other">💳 Other</option></select></label>
     </div>
     <div class="row2">
-      <label class="f">Amount borrowed<input name="principal" inputmode="decimal" autocomplete="off" placeholder="240 000"></label>
-      <label class="f">Interest rate (% a year)<input name="rate" inputmode="decimal" autocomplete="off" placeholder="3,40"></label>
+      <label class="f"><span data-i18n="Amount borrowed">Amount borrowed</span><input name="principal" inputmode="decimal" autocomplete="off" placeholder="240 000"></label>
+      <label class="f"><span data-i18n="Interest rate (% a year)">Interest rate (% a year)</span><input name="rate" inputmode="decimal" autocomplete="off" placeholder="3,40"></label>
     </div>
     <div class="row2">
-      <label class="f">First payment date<input name="start_date" type="date"></label>
-      <label class="f">Length in months<input name="term_months" inputmode="numeric" autocomplete="off" placeholder="300 = 25 years"></label>
+      <label class="f"><span data-i18n="First payment date">First payment date</span><input name="start_date" type="date"></label>
+      <label class="f"><span data-i18n="Length in months">Length in months</span><input name="term_months" inputmode="numeric" autocomplete="off" data-i18n-ph="300 = 25 years" placeholder="300 = 25 years"></label>
     </div>
     <div class="row2">
-      <label class="f">Monthly payment <small>optional</small><input name="payment" inputmode="decimal" autocomplete="off" placeholder="calculated"></label>
-      <label class="f">Monthly insurance <small>optional</small><input name="insurance" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      <label class="f"><span><span data-i18n="Monthly payment">Monthly payment</span> <small data-i18n="optional">optional</small></span><input name="payment" inputmode="decimal" autocomplete="off" data-i18n-ph="calculated" placeholder="calculated"></label>
+      <label class="f"><span><span data-i18n="Monthly insurance">Monthly insurance</span> <small data-i18n="optional">optional</small></span><input name="insurance" inputmode="decimal" autocomplete="off" placeholder="0"></label>
     </div>
-    <label class="f">Text on your bank statement <small>optional, finds the real payments</small><input name="keyword" autocomplete="off" placeholder="e.g. PRET IMMO"></label>
+    <label class="f"><span><span data-i18n="Text on your bank statement">Text on your bank statement</span> <small data-i18n="optional, finds the real payments">optional, finds the real payments</small></span><input name="keyword" autocomplete="off" data-i18n-ph="e.g. PRET IMMO" placeholder="e.g. PRET IMMO"></label>
     <p class="small muted" id="loanHint" style="margin:0"></p>
     <p id="loanErr" class="formerr" role="alert" hidden></p>
     <div class="dlg-actions">
-      <button type="button" class="btn" data-action="closeLoan">Cancel</button>
-      <button type="submit" class="btn primary">Save</button>
+      <button type="button" class="btn" data-action="closeLoan" data-i18n="Cancel">Cancel</button>
+      <button type="submit" class="btn primary" data-i18n="Save">Save</button>
     </div>
   </form>
 </dialog>
